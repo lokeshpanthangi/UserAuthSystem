@@ -1,12 +1,14 @@
 # Authentication router for user registration, login, and profile management
 # This module handles all authentication-related API endpoints
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Request
 from fastapi.security import HTTPBearer
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 from datetime import timedelta
 import logging
+import secrets
+import uuid
 
 from app.core.database import get_database_session
 from app.core.security import (
@@ -28,6 +30,7 @@ from app.schemas.user import (
     PasswordChangeRequest
 )
 from app.dependencies.auth import get_current_active_user
+from app.core.middleware import limiter
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -54,7 +57,9 @@ router = APIRouter(
         422: {"description": "Validation error"}
     }
 )
+@limiter.limit("3/minute")
 async def register_user(
+    request: Request,
     user_data: UserCreate,
     db: Session = Depends(get_database_session)
 ):
@@ -149,7 +154,9 @@ async def register_user(
         422: {"description": "Validation error"}
     }
 )
+@limiter.limit("5/minute")
 async def login_user(
+    request: Request,
     login_data: UserLogin,
     db: Session = Depends(get_database_session)
 ):
@@ -242,7 +249,9 @@ async def login_user(
         401: {"description": "Authentication required"}
     }
 )
+@limiter.limit("30/minute")
 async def get_current_user_profile(
+    request: Request,
     current_user: User = Depends(get_current_active_user)
 ):
     """
@@ -268,11 +277,14 @@ async def get_current_user_profile(
     description="Change the password for the currently authenticated user",
     responses={
         200: {"description": "Password changed successfully"},
+        400: {"description": "Invalid current password"},
         401: {"description": "Authentication required"},
-        400: {"description": "Invalid current password"}
+        422: {"description": "Validation error"}
     }
 )
+@limiter.limit("5/minute")
 async def change_password(
+    request: Request,
     password_data: PasswordChangeRequest,
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_database_session)
@@ -348,7 +360,9 @@ async def change_password(
         401: {"description": "Authentication required"}
     }
 )
+@limiter.limit("10/minute")
 async def refresh_token(
+    request: Request,
     current_user: User = Depends(get_current_active_user)
 ):
     """
@@ -389,6 +403,116 @@ async def refresh_token(
             detail="Token refresh failed due to server error"
         )
 
+@router.post(
+    "/logout",
+    response_model=MessageResponse,
+    summary="User logout",
+    description="Logout user and invalidate token",
+    responses={
+        200: {"description": "Logout successful"},
+        401: {"description": "Authentication required"}
+    }
+)
+async def logout_user(
+    current_user: User = Depends(get_current_active_user)
+):
+    """
+    Logout user and invalidate token.
+    
+    This endpoint logs out the current user. In a production environment,
+    you would typically maintain a blacklist of invalidated tokens.
+    
+    Args:
+        current_user: Current authenticated user
+    
+    Returns:
+        MessageResponse: Logout confirmation
+    """
+    logger.info(f"Logout request for user: {current_user.username}")
+    
+    # In a production environment, you would add the token to a blacklist
+    # For now, we just return a success message
+    
+    return MessageResponse(
+        message="Logout successful",
+        success=True,
+        data={"user_id": str(current_user.id)}
+    )
+
+@router.post(
+    "/forgot-password",
+    response_model=MessageResponse,
+    summary="Password reset request",
+    description="Request a password reset token",
+    responses={
+        200: {"description": "Password reset email sent"},
+        404: {"description": "User not found"},
+        422: {"description": "Validation error"}
+    }
+)
+@limiter.limit("1/minute")
+async def forgot_password(
+    request: Request,
+    email_data: dict,
+    db: Session = Depends(get_database_session)
+):
+    """
+    Request a password reset.
+    
+    This endpoint generates a password reset token and would typically
+    send it via email. For security, it always returns success even
+    if the email doesn't exist.
+    
+    Args:
+        request: HTTP request object
+        email_data: Dictionary containing email address
+        db: Database session
+    
+    Returns:
+        MessageResponse: Success message
+    """
+    email = email_data.get("email")
+    
+    if not email:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Email address is required"
+        )
+    
+    logger.info(f"Password reset request for email: {email}")
+    
+    try:
+        # Find user by email
+        user = db.query(User).filter(User.email == email).first()
+        
+        if user:
+            # Generate reset token (in production, store this in database with expiration)
+            reset_token = secrets.token_urlsafe(32)
+            
+            # In production, you would:
+            # 1. Store the reset token in database with expiration
+            # 2. Send email with reset link containing the token
+            # 3. Implement a separate endpoint to verify token and reset password
+            
+            logger.info(f"Password reset token generated for user: {user.username}")
+            
+            # For demo purposes, log the token (NEVER do this in production)
+            logger.info(f"Reset token (demo only): {reset_token}")
+        
+        # Always return success for security (don't reveal if email exists)
+        return MessageResponse(
+            message="If the email address exists, a password reset link has been sent",
+            success=True
+        )
+    
+    except Exception as e:
+        logger.error(f"Error during password reset request: {str(e)}")
+        # Still return success for security
+        return MessageResponse(
+            message="If the email address exists, a password reset link has been sent",
+            success=True
+        )
+
 # Health check endpoint for authentication service
 @router.get(
     "/health",
@@ -412,6 +536,8 @@ async def auth_health_check():
             "registration": True,
             "login": True,
             "password_change": True,
-            "token_refresh": True
+            "token_refresh": True,
+            "logout": True,
+            "forgot_password": True
         }
     }

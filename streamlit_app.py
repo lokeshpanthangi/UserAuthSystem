@@ -64,9 +64,11 @@ def login_user(username, password):
         if profile_response and profile_response.status_code == 200:
             st.session_state.user_info = profile_response.json()
             st.session_state.is_admin = st.session_state.user_info.get('role') == 'admin'
-            return True
+            return {'success': True, 'response': response}
+        else:
+            return {'success': False, 'response': profile_response, 'error': 'Failed to get user profile'}
     
-    return False
+    return {'success': False, 'response': response}
 
 def register_user(username, email, password):
     """Register new user"""
@@ -189,11 +191,52 @@ def show_login_page():
             if submitted:
                 if username and password:
                     with st.spinner("Logging in..."):
-                        if login_user(username, password):
+                        login_result = login_user(username, password)
+                        if login_result['success']:
                             st.success("✅ Login successful!")
                             st.rerun()
                         else:
-                            st.error("❌ Invalid credentials. Please try again.")
+                            response = login_result.get('response')
+                            if response:
+                                try:
+                                    error_data = response.json()
+                                    if isinstance(error_data, dict):
+                                        if 'detail' in error_data:
+                                            if isinstance(error_data['detail'], list):
+                                                error_msgs = []
+                                                for error in error_data['detail']:
+                                                    if isinstance(error, dict) and 'msg' in error:
+                                                        error_msgs.append(error['msg'])
+                                                    else:
+                                                        error_msgs.append(str(error))
+                                                error_msg = "; ".join(error_msgs)
+                                            else:
+                                                error_msg = str(error_data['detail'])
+                                        elif 'message' in error_data:
+                                            error_msg = error_data['message']
+                                        else:
+                                            error_msg = f"Login failed (Status: {response.status_code})"
+                                    else:
+                                        error_msg = f"Login failed (Status: {response.status_code})"
+                                    
+                                    st.error(f"❌ {error_msg}")
+                                    
+                                    # Show additional debug info in expander for non-401 errors
+                                    if response.status_code != 401:
+                                        with st.expander("🔍 Technical Details", expanded=False):
+                                            st.write(f"**Status Code:** {response.status_code}")
+                                            st.write(f"**Response Headers:** {dict(response.headers)}")
+                                            st.json(error_data)
+                                            
+                                except Exception as e:
+                                    st.error(f"❌ Login failed (Status: {response.status_code})")
+                                    with st.expander("🔍 Technical Details", expanded=False):
+                                        st.write(f"**Status Code:** {response.status_code}")
+                                        st.write(f"**Raw Response:** {response.text}")
+                                        st.write(f"**Parse Error:** {str(e)}")
+                            else:
+                                error_msg = login_result.get('error', 'Login failed. Could not connect to server.')
+                                st.error(f"❌ {error_msg}")
                 else:
                     st.warning("⚠️ Please fill in all fields.")
 
@@ -223,10 +266,45 @@ def show_register_page():
                             if response and response.status_code == 201:
                                 st.success("✅ Account created successfully! Please login.")
                             elif response:
-                                error_msg = response.json().get('detail', 'Registration failed')
-                                st.error(f"❌ {error_msg}")
+                                try:
+                                    error_data = response.json()
+                                    if isinstance(error_data, dict):
+                                        # Handle different error response formats
+                                        if 'detail' in error_data:
+                                            if isinstance(error_data['detail'], list):
+                                                # Validation errors
+                                                error_msgs = []
+                                                for error in error_data['detail']:
+                                                    if isinstance(error, dict) and 'msg' in error:
+                                                        error_msgs.append(error['msg'])
+                                                    else:
+                                                        error_msgs.append(str(error))
+                                                error_msg = "; ".join(error_msgs)
+                                            else:
+                                                error_msg = str(error_data['detail'])
+                                        elif 'message' in error_data:
+                                            error_msg = error_data['message']
+                                        else:
+                                            error_msg = f"Registration failed (Status: {response.status_code})"
+                                    else:
+                                        error_msg = f"Registration failed (Status: {response.status_code})"
+                                    
+                                    st.error(f"❌ {error_msg}")
+                                    
+                                    # Show additional debug info in expander
+                                    with st.expander("🔍 Technical Details", expanded=False):
+                                        st.write(f"**Status Code:** {response.status_code}")
+                                        st.write(f"**Response Headers:** {dict(response.headers)}")
+                                        st.json(error_data)
+                                        
+                                except Exception as e:
+                                    st.error(f"❌ Registration failed (Status: {response.status_code})")
+                                    with st.expander("🔍 Technical Details", expanded=False):
+                                        st.write(f"**Status Code:** {response.status_code}")
+                                        st.write(f"**Raw Response:** {response.text}")
+                                        st.write(f"**Parse Error:** {str(e)}")
                             else:
-                                st.error("❌ Registration failed. Please try again.")
+                                st.error("❌ Registration failed. Could not connect to server.")
                 else:
                     st.warning("⚠️ Please fill in all fields.")
 

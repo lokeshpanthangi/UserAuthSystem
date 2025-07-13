@@ -13,6 +13,7 @@ from contextlib import asynccontextmanager
 
 from app.core.config import settings
 from app.core.database import create_database_tables, db_manager
+from app.core.middleware import setup_rate_limiting, setup_security_middleware
 from app.routers import auth_router, users_router
 from app.schemas.user import ErrorResponse
 
@@ -87,6 +88,12 @@ app = FastAPI(
     openapi_url="/openapi.json" if settings.environment != "production" else None,
 )
 
+# Setup rate limiting
+setup_rate_limiting(app)
+
+# Setup security middleware
+setup_security_middleware(app)
+
 # Add security middleware
 if settings.environment == "production":
     # Add trusted host middleware for production
@@ -95,13 +102,24 @@ if settings.environment == "production":
         allowed_hosts=["localhost", "127.0.0.1"]  # Configure as needed
     )
 
-# Add CORS middleware
+# Add CORS middleware with more restrictive settings
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.cors_origins_list,
+    allow_origins=[
+        "http://localhost:8501",  # Streamlit frontend
+        "http://127.0.0.1:8501",
+        "http://localhost:3000",  # Common React dev server
+        "http://127.0.0.1:3000"
+    ] + settings.cors_origins_list,
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allow_headers=["*"],
+    allow_headers=[
+        "Authorization",
+        "Content-Type",
+        "Accept",
+        "Origin",
+        "X-Requested-With"
+    ],
     expose_headers=["X-Total-Count", "X-Page-Count"]
 )
 

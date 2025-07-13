@@ -178,6 +178,7 @@ class UserProfile(BaseModel):
     role: UserRole
     is_active: bool
     created_at: datetime
+    updated_at: Optional[datetime] = None
     
     class Config:
         from_attributes = True
@@ -248,6 +249,9 @@ class TokenResponse(BaseModel):
     user: UserProfile = Field(..., description="User profile information")
     
     class Config:
+        json_encoders = {
+            datetime: lambda v: v.isoformat() if v else None
+        }
         schema_extra = {
             "example": {
                 "access_token": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9...",
