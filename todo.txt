@@ -1,0 +1,302 @@
+Project Overview
+Create a secure user authentication system using FastAPI, SQLAlchemy, and Supabase PostgreSQL. This system should handle user registration, login, JWT tokens, and role-based access control with automatic API documentation.
+Technology Stack Setup Requirements
+
+Backend Framework: FastAPI (Python)
+Database: Supabase PostgreSQL
+ORM: SQLAlchemy with Alembic for migrations
+Authentication: JWT tokens with python-jose library
+Password Hashing: bcrypt via passlib
+Environment Management: python-dotenv
+API Documentation: Built-in FastAPI Swagger UI
+
+Step-by-Step Implementation Guide
+Phase 1: Project Foundation and Environment Setup
+Step 1.1: Create Project Structure
+Set up a clean project directory with these folders:
+
+app/ (main application code)
+app/models/ (database models)
+app/routers/ (API endpoints)
+app/core/ (configuration and security)
+app/dependencies/ (dependency injection)
+alembic/ (database migrations)
+
+Step 1.2: Install Required Dependencies
+Create a requirements.txt file with all necessary packages:
+
+FastAPI for the web framework
+SQLAlchemy for database ORM
+Alembic for database migrations
+psycopg2-binary for PostgreSQL connection
+python-jose for JWT token handling
+passlib with bcrypt for password hashing
+python-dotenv for environment variables
+uvicorn for running the server
+
+Step 1.3: Environment Configuration
+Create a .env file to store sensitive information:
+
+Supabase database connection URL
+JWT secret key (generate a secure random string)
+JWT algorithm (use HS256)
+JWT expiration time (30 minutes)
+Database connection parameters
+
+Step 1.4: Supabase Database Setup
+Connect to Supabase and:
+
+Create a new project in Supabase dashboard
+Get the PostgreSQL connection string
+Configure database access permissions
+Enable Row Level Security if needed
+
+Phase 2: Database Models and Schema Design
+Step 2.1: User Model Creation
+Design a User model with these fields:
+
+id: Primary key (UUID or integer)
+username: Unique identifier for login
+email: User's email address (unique)
+hashed_password: Bcrypt-hashed password
+role: User role (enum: "user", "admin")
+is_active: Boolean flag for account status
+created_at: Timestamp of account creation
+updated_at: Timestamp of last update
+
+Step 2.2: Database Configuration
+Set up SQLAlchemy database connection:
+
+Create database engine with Supabase connection string
+Configure session management
+Set up Base class for models
+Create database session dependency for FastAPI
+
+Step 2.3: Migration Setup
+Initialize Alembic for database migrations:
+
+Create initial migration for User table
+Set up migration environment
+Configure migration scripts to work with Supabase
+
+Phase 3: Core Security Implementation
+Step 3.1: Password Security
+Implement password handling utilities:
+
+Password hashing function using bcrypt
+Password verification function
+Password strength validation (minimum 8 characters, special characters, numbers)
+
+Step 3.2: JWT Token System
+Create JWT token management:
+
+Token creation function with user data and expiration
+Token verification and decoding function
+Token expiration handling (30 minutes)
+Include user ID and role in token payload
+
+Step 3.3: Security Dependencies
+Build FastAPI dependencies for:
+
+Database session injection
+Current user extraction from JWT token
+Admin role verification
+Authentication requirement enforcement
+
+Phase 4: API Endpoints Implementation
+Step 4.1: Authentication Endpoints
+Create /auth router with these endpoints:
+POST /auth/register
+
+Accept username, email, password in request body
+Validate password strength requirements
+Check for duplicate username and email
+Hash password using bcrypt
+Create new user record in database
+Return success message (don't return sensitive data)
+
+POST /auth/login
+
+Accept username/email and password
+Verify user exists and is active
+Validate password against hashed version
+Generate JWT token with user info
+Return token and basic user information
+Handle authentication failures with proper error messages
+
+GET /auth/me
+
+Require valid JWT token
+Extract current user from token
+Return current user's profile information
+Exclude sensitive data like password hash
+
+Step 4.2: User Management Endpoints
+Create /users router with admin-only endpoints:
+GET /users
+
+Require admin role authentication
+Return paginated list of all users
+Include user details but exclude passwords
+Allow filtering and sorting options
+
+PUT /users/{user_id}/role
+
+Require admin role authentication
+Accept new role in request body
+Validate role value (user/admin)
+Update user's role in database
+Return updated user information
+
+DELETE /users/{user_id}
+
+Require admin role authentication
+Check if user exists
+Prevent admin from deleting themselves
+Soft delete or hard delete based on requirements
+Return confirmation message
+
+Phase 5: Security Middleware and Validation
+Step 5.1: Authentication Middleware
+Create middleware functions:
+
+JWT token extraction from Authorization header
+Token validation and user lookup
+Handle expired tokens gracefully
+Inject current user into request context
+
+Step 5.2: Role-Based Access Control
+Implement role checking:
+
+Admin-only decorator for sensitive endpoints
+Role verification in dependencies
+Proper error responses for unauthorized access
+
+Step 5.3: Input Validation
+Add validation for:
+
+Email format validation
+Username format requirements
+Password complexity rules
+Request body schema validation using Pydantic
+
+Phase 6: Error Handling and Response Models
+Step 6.1: Custom Exception Classes
+Create specific exceptions for:
+
+Authentication failures
+Authorization errors
+Duplicate user errors
+User not found errors
+Invalid token errors
+
+Step 6.2: Response Models
+Define Pydantic models for:
+
+User registration request/response
+Login request/response
+User profile response
+Token response structure
+Error response format
+
+Step 6.3: Global Exception Handlers
+Implement exception handlers for:
+
+Database connection errors
+JWT token errors
+Validation errors
+Authentication failures
+General server errors
+
+Phase 7: API Documentation and Testing
+Step 7.1: FastAPI Documentation
+Configure automatic documentation:
+
+Add description and metadata to FastAPI app
+Include authentication scheme in OpenAPI
+Add examples for request/response bodies
+Document all endpoints with proper descriptions
+
+Step 7.2: Security Testing
+Test security scenarios:
+
+Invalid token handling
+Expired token behavior
+Role-based access enforcement
+Password hashing verification
+Duplicate user prevention
+
+Step 7.3: Endpoint Testing
+Create test cases for:
+
+User registration flow
+Login authentication
+Protected route access
+Admin functionality
+Error handling scenarios
+
+Phase 8: Production Considerations
+Step 8.1: Security Hardening
+Implement additional security:
+
+Rate limiting for login attempts
+CORS configuration
+Security headers
+Input sanitization
+SQL injection prevention
+
+Step 8.2: Performance Optimization
+Add performance improvements:
+
+Database query optimization
+Connection pooling
+Caching for frequently accessed data
+Efficient pagination
+
+Step 8.3: Deployment Preparation
+Prepare for deployment:
+
+Environment-specific configurations
+Database migration scripts
+Health check endpoints
+Logging configuration
+Docker containerization (optional)
+
+Expected File Structure
+project/
+├── app/
+│   ├── __init__.py
+│   ├── main.py (FastAPI app)
+│   ├── core/
+│   │   ├── config.py (settings)
+│   │   ├── security.py (JWT, password hashing)
+│   │   └── database.py (DB connection)
+│   ├── models/
+│   │   ├── __init__.py
+│   │   └── user.py (User model)
+│   ├── routers/
+│   │   ├── __init__.py
+│   │   ├── auth.py (authentication endpoints)
+│   │   └── users.py (user management endpoints)
+│   ├── dependencies/
+│   │   ├── __init__.py
+│   │   └── auth.py (auth dependencies)
+│   └── schemas/
+│       ├── __init__.py
+│       └── user.py (Pydantic models)
+├── alembic/
+├── requirements.txt
+├── .env
+└── README.md
+Key Implementation Notes
+
+Security First: Always hash passwords before storing, never return sensitive data in responses
+Error Handling: Provide meaningful error messages without revealing system details
+Database Transactions: Use proper transaction handling for data consistency
+Token Security: Use secure JWT secrets and implement proper token validation
+Role Management: Ensure role-based access is properly enforced at all levels
+Input Validation: Validate all input data using Pydantic models
+Documentation: Leverage FastAPI's automatic documentation generation
+Testing: Write comprehensive tests for all authentication flows
+
+This implementation should result in a secure, well-documented, and scalable authentication system ready for production use with proper error handling and security measures.

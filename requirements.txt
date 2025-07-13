@@ -1,0 +1,25 @@
+# FastAPI and web framework dependencies
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+
+# Database and ORM
+sqlalchemy==2.0.23
+alembic==1.13.1
+psycopg2-binary==2.9.9
+
+# Authentication and security
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+python-multipart==0.0.6
+
+# Environment and configuration
+python-dotenv==1.0.0
+
+# Additional utilities
+pydantic==2.5.0
+pydantic-settings==2.1.0
+
+# Frontend dependencies
+streamlit==1.28.1
+requests==2.31.0
+pandas==2.1.3
